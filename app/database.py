@@ -45,6 +45,29 @@ def ensure_optional_columns() -> None:
                     connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl}"))
 
 
+def ensure_column_sizes() -> None:
+    sized_columns = {
+        "supplier_entries": {
+            "okpd2_code": "VARCHAR(255) NULL",
+            "mtr_class": "VARCHAR(255) NULL",
+            "supplier_site": "VARCHAR(255) NULL",
+            "manufacturer_inn": "VARCHAR(255) NULL",
+            "supplier_inn": "VARCHAR(255) NULL",
+            "currency": "VARCHAR(255) NULL",
+        },
+        "mtr_cards": {
+            "manufacturer_inn": "VARCHAR(255) NULL",
+            "mtr_class": "VARCHAR(255) NULL",
+            "currency_code": "VARCHAR(255) NULL",
+        },
+    }
+
+    with engine.begin() as connection:
+        for table_name, columns in sized_columns.items():
+            for column_name, ddl in columns.items():
+                connection.execute(text(f"ALTER TABLE {table_name} MODIFY COLUMN {column_name} {ddl}"))
+
+
 def get_db():
     db = SessionLocal()
     try:

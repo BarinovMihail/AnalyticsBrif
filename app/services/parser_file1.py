@@ -187,6 +187,7 @@ def import_file1(db: Session, file_path: str | Path) -> dict:
 
             nomenclature_name = parsed_row["nomenclature_name"]
             manufacturer_inn = parsed_row["manufacturer_inn"]
+            manufacturer_inn = str(manufacturer_inn).strip()[:255] if manufacturer_inn else None
 
             if not nomenclature_name:
                 logger.warning("Строка %s: отсутствует наименование номенклатуры, строка пропущена", excel_row)
