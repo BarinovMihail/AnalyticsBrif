@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.database import Base, engine
+from app.database import Base, engine, ensure_optional_columns
 from app.routers.search import router as search_router
 from app.routers.upload import router as upload_router
 
@@ -24,6 +24,7 @@ app.add_middleware(
 )
 
 Base.metadata.create_all(bind=engine)
+ensure_optional_columns()
 
 app.include_router(upload_router)
 app.include_router(search_router)

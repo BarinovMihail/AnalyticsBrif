@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 
@@ -28,6 +28,21 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
 
 Base = declarative_base()
+
+
+def ensure_optional_columns() -> None:
+    inspector = inspect(engine)
+    table_columns = {
+        "supplier_entries": {"manufacturer_identifier_type": "VARCHAR(10) NULL"},
+        "mtr_cards": {"manufacturer_identifier_type": "VARCHAR(10) NULL"},
+    }
+
+    with engine.begin() as connection:
+        for table_name, columns in table_columns.items():
+            existing_columns = {column["name"] for column in inspector.get_columns(table_name)}
+            for column_name, ddl in columns.items():
+                if column_name not in existing_columns:
+                    connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl}"))
 
 
 def get_db():
