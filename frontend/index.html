@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Сравнение МТР-карточек БРИФ</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --panel: #fffaf2;
+      --panel-strong: #fff;
+      --ink: #1f2933;
+      --muted: #6b7280;
+      --line: #d7c7af;
+      --accent: #a54b1a;
+      --accent-dark: #7a3310;
+      --success: #276749;
+      --danger: #b83232;
+      --shadow: 0 18px 40px rgba(77, 51, 24, 0.12);
+      --radius: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(255, 217, 170, 0.8), transparent 30%),
+        linear-gradient(180deg, #fbf3e7 0%, #f2e5d4 100%);
+      min-height: 100vh;
+    }
+
+    .shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, rgba(165, 75, 26, 0.94), rgba(84, 40, 18, 0.92));
+      color: #fff9f2;
+      padding: 28px;
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1.05;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 820px;
+      color: rgba(255, 249, 242, 0.88);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .tab-button {
+      border: 1px solid rgba(122, 51, 16, 0.18);
+      background: rgba(255, 250, 242, 0.85);
+      color: var(--ink);
+      padding: 12px 18px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .tab-button.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .tab-panel {
+      display: none;
+      background: rgba(255, 250, 242, 0.92);
+      border: 1px solid rgba(122, 51, 16, 0.1);
+      border-radius: 24px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .tab-panel.active {
+      display: block;
+      animation: fadeIn .2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+
+    .card h2, .card h3 {
+      margin-top: 0;
+    }
+
+    .dropzone {
+      border: 2px dashed #c9a47a;
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      background: linear-gradient(180deg, rgba(255, 241, 220, 0.6), rgba(255, 255, 255, 0.9));
+      transition: .2s ease;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: #fff0df;
+    }
+
+    button, select, input {
+      font: inherit;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 11px 16px;
+      cursor: pointer;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+
+    button.secondary {
+      background: #e9d9c2;
+      color: var(--ink);
+    }
+
+    button.danger {
+      background: var(--danger);
+    }
+
+    button:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+
+    .status {
+      margin-top: 14px;
+      min-height: 24px;
+      color: var(--muted);
+    }
+
+    .status.success {
+      color: var(--success);
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .filters {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .filter-row {
+      display: grid;
+      grid-template-columns: minmax(240px, 2fr) minmax(190px, 1fr) minmax(180px, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .filter-row input, .filter-row select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: white;
+    }
+
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #f0e2cf;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    tr.result-row {
+      cursor: pointer;
+    }
+
+    tr.result-row:hover {
+      background: #fff7eb;
+    }
+
+    tr.details-row {
+      display: none;
+      background: #fffdf8;
+    }
+
+    tr.details-row.open {
+      display: table-row;
+    }
+
+    .details-box {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 10px 18px;
+      padding: 6px 0;
+    }
+
+    .details-item {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #fcf1e4;
+      border: 1px solid #ead5bc;
+    }
+
+    .details-item strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .stat {
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 820px) {
+      .filter-row {
+        grid-template-columns: 1fr;
+      }
+
+      table, thead, tbody, th, td, tr {
+        display: block;
+      }
+
+      thead {
+        display: none;
+      }
+
+      tr.result-row, tr.details-row {
+        border-bottom: 1px solid #ead5bc;
+      }
+
+      tr.result-row td {
+        padding: 8px 12px;
+      }
+
+      tr.result-row td::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <h1>Сравнение МТР-карточек БРИФ</h1>
+      <p>Загрузите выгрузку закупок и карточки МТР, настройте жёсткие фильтры по характеристикам и получите поставщиков-конкурентов с раскрытием совпавших карточек.</p>
+    </section>
+
+    <div class="tabs">
+      <button class="tab-button active" data-tab="upload">Загрузка</button>
+      <button class="tab-button" data-tab="search">Поиск</button>
+      <button class="tab-button" data-tab="data">Данные</button>
+    </div>
+
+    <section id="tab-upload" class="tab-panel active">
+      <div class="grid-2">
+        <div class="card">
+          <h2>Файл 1</h2>
+          <p class="muted">Выгрузка закупок с ИНН изготовителей и поставщиков.</p>
+          <div class="dropzone" data-upload="file1">
+            <p>Перетащите `.xlsx` сюда</p>
+            <p class="muted">или</p>
+            <button type="button" class="secondary choose-file">Выбрать файл</button>
+            <input class="hidden file-input" type="file" accept=".xlsx">
+          </div>
+          <div id="status-file1" class="status"></div>
+        </div>
+
+        <div class="card">
+          <h2>Файл 2</h2>
+          <p class="muted">Карточки МТР с характеристиками и ИНН изготовителей.</p>
+          <div class="dropzone" data-upload="file2">
+            <p>Перетащите `.xlsx` сюда</p>
+            <p class="muted">или</p>
+            <button type="button" class="secondary choose-file">Выбрать файл</button>
+            <input class="hidden file-input" type="file" accept=".xlsx">
+          </div>
+          <div id="status-file2" class="status"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-search" class="tab-panel">
+      <div class="card">
+        <div class="meta">
+          <div>
+            <h2>Поиск конкурентов</h2>
+            <p class="muted">Каждый фильтр должен выполниться одновременно.</p>
+          </div>
+          <button id="add-filter" type="button">+ Добавить фильтр</button>
+        </div>
+
+        <datalist id="characteristics-list"></datalist>
+        <div id="filters" class="filters"></div>
+
+        <div class="actions">
+          <button id="search-button" type="button">Найти</button>
+          <button id="reset-button" type="button" class="secondary">Сбросить</button>
+          <button id="export-button" type="button" class="secondary" disabled>Экспорт в Excel</button>
+        </div>
+        <div id="search-status" class="status"></div>
+      </div>
+
+      <div class="card" style="margin-top: 20px;">
+        <div class="meta">
+          <h3 id="results-count">Найдено конкурентов: 0</h3>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Наименование</th>
+                <th>ИНН изготовителя</th>
+                <th>Поставщик</th>
+                <th>ИНН поставщика</th>
+                <th>Дата контракта</th>
+                <th>Цена</th>
+              </tr>
+            </thead>
+            <tbody id="results-body">
+              <tr><td colspan="6" class="muted">Результаты появятся после запуска поиска.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-data" class="tab-panel">
+      <div class="card">
+        <h2>Данные в базе</h2>
+        <div class="stats">
+          <div class="stat">
+            <div class="muted">supplier_entries</div>
+            <div class="stat-value" id="stat-suppliers">0</div>
+          </div>
+          <div class="stat">
+            <div class="muted">mtr_cards</div>
+            <div class="stat-value" id="stat-cards">0</div>
+          </div>
+          <div class="stat">
+            <div class="muted">card_characteristics</div>
+            <div class="stat-value" id="stat-chars">0</div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="refresh-stats" type="button" class="secondary">Обновить статистику</button>
+          <button id="clear-file1" type="button" class="danger">Очистить Файл 1</button>
+          <button id="clear-file2" type="button" class="danger">Очистить Файл 2</button>
+        </div>
+        <div id="data-status" class="status"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const operatorOptions = [
+      { value: "eq_str", label: "= (точное совпадение)" },
+      { value: "eq", label: "= (числовое равенство)" },
+      { value: "gte", label: "≥ (больше или равно)" },
+      { value: "lte", label: "≤ (меньше или равно)" },
+      { value: "range_max_gte", label: "верхняя граница ≥" },
+      { value: "range_max_lte", label: "верхняя граница ≤" },
+    ];
+
+    let searchResults = [];
+
+    function setStatus(elementId, message, type = "") {
+      const node = document.getElementById(elementId);
+      node.textContent = message;
+      node.className = `status ${type}`.trim();
+    }
+
+    function formatDate(dateValue) {
+      if (!dateValue) return "—";
+      return dateValue;
+    }
+
+    function createFilterRow(initial = {}) {
+      const row = document.createElement("div");
+      row.className = "filter-row";
+
+      const charInput = document.createElement("input");
+      charInput.placeholder = "Название характеристики";
+      charInput.setAttribute("list", "characteristics-list");
+      charInput.value = initial.char_name || "";
+
+      const operatorSelect = document.createElement("select");
+      operatorOptions.forEach((option) => {
+        const node = document.createElement("option");
+        node.value = option.value;
+        node.textContent = option.label;
+        if ((initial.operator || "eq_str") === option.value) {
+          node.selected = true;
+        }
+        operatorSelect.appendChild(node);
+      });
+
+      const valueInput = document.createElement("input");
+      valueInput.placeholder = "Значение";
+      valueInput.value = initial.value || "";
+
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "secondary";
+      removeButton.textContent = "Удалить";
+      removeButton.addEventListener("click", () => row.remove());
+
+      row.append(charInput, operatorSelect, valueInput, removeButton);
+      return row;
+    }
+
+    function getFilters() {
+      return [...document.querySelectorAll(".filter-row")]
+        .map((row) => {
+          const [charInput, operatorSelect, valueInput] = row.querySelectorAll("input, select");
+          return {
+            char_name: charInput.value.trim(),
+            operator: operatorSelect.value,
+            value: valueInput.value.trim(),
+          };
+        })
+        .filter((filter) => filter.char_name && filter.value);
+    }
+
+    function renderResults(results) {
+      const body = document.getElementById("results-body");
+      const count = document.getElementById("results-count");
+      body.innerHTML = "";
+      count.textContent = `Найдено конкурентов: ${results.length}`;
+
+      if (!results.length) {
+        body.innerHTML = '<tr><td colspan="6" class="muted">Совпадений не найдено.</td></tr>';
+        return;
+      }
+
+      results.forEach((item, index) => {
+        const resultRow = document.createElement("tr");
+        resultRow.className = "result-row";
+        resultRow.innerHTML = `
+          <td data-label="Наименование">${item.card_nomenclature || "—"}</td>
+          <td data-label="ИНН изготовителя">${item.manufacturer_inn || "—"}</td>
+          <td data-label="Поставщик">${item.supplier_site || "—"}</td>
+          <td data-label="ИНН поставщика">${item.supplier_inn || "—"}</td>
+          <td data-label="Дата контракта">${formatDate(item.contract_date)}</td>
+          <td data-label="Цена">${item.price ?? "—"}</td>
+        `;
+
+        const detailsRow = document.createElement("tr");
+        detailsRow.className = "details-row";
+        const detailsCell = document.createElement("td");
+        detailsCell.colSpan = 6;
+
+        const detailsBox = document.createElement("div");
+        detailsBox.className = "details-box";
+        const characteristics = Object.entries(item.all_characteristics || {});
+        if (!characteristics.length) {
+          detailsBox.innerHTML = '<div class="details-item">Характеристики отсутствуют.</div>';
+        } else {
+          characteristics
+            .sort((a, b) => a[0].localeCompare(b[0], "ru"))
+            .forEach(([name, value]) => {
+              const block = document.createElement("div");
+              block.className = "details-item";
+              block.innerHTML = `<strong>${name}</strong><span>${value || "—"}</span>`;
+              detailsBox.appendChild(block);
+            });
+        }
+
+        detailsCell.appendChild(detailsBox);
+        detailsRow.appendChild(detailsCell);
+
+        resultRow.addEventListener("click", () => {
+          detailsRow.classList.toggle("open");
+        });
+
+        body.append(resultRow, detailsRow);
+      });
+    }
+
+    async function fetchJson(url, options = {}) {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        let message = "Ошибка запроса";
+        try {
+          const data = await response.json();
+          message = data.detail || JSON.stringify(data);
+        } catch (_) {}
+        throw new Error(message);
+      }
+      return response.json();
+    }
+
+    async function loadCharacteristics() {
+      try {
+        const names = await fetchJson("/api/file2/characteristics-names");
+        const datalist = document.getElementById("characteristics-list");
+        datalist.innerHTML = names.map((name) => `<option value="${name}"></option>`).join("");
+      } catch (_) {}
+    }
+
+    async function loadStats() {
+      try {
+        const stats = await fetchJson("/api/stats");
+        document.getElementById("stat-suppliers").textContent = stats.supplier_entries_count;
+        document.getElementById("stat-cards").textContent = stats.mtr_cards_count;
+        document.getElementById("stat-chars").textContent = stats.characteristics_count;
+      } catch (error) {
+        setStatus("data-status", error.message, "error");
+      }
+    }
+
+    async function handleUpload(kind, file) {
+      const formData = new FormData();
+      formData.append("file", file);
+      setStatus(`status-${kind}`, "Загрузка файла...");
+
+      try {
+        const result = await fetchJson(`/api/upload/${kind}`, {
+          method: "POST",
+          body: formData,
+        });
+        const message = `Импортировано: ${result.imported}, пропущено: ${result.skipped}, ошибки: ${result.errors.length}`;
+        setStatus(`status-${kind}`, message, result.errors.length ? "error" : "success");
+        await Promise.all([loadStats(), loadCharacteristics()]);
+      } catch (error) {
+        setStatus(`status-${kind}`, error.message, "error");
+      }
+    }
+
+    async function runSearch() {
+      const filters = getFilters();
+      if (!filters.length) {
+        setStatus("search-status", "Добавьте хотя бы один заполненный фильтр.", "error");
+        return;
+      }
+
+      setStatus("search-status", "Ищу совпадающие карточки...");
+      try {
+        const result = await fetchJson("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filters }),
+        });
+        searchResults = result.results;
+        renderResults(result.results);
+        document.getElementById("export-button").disabled = false;
+        setStatus("search-status", `Поиск завершён. Найдено: ${result.total}`, "success");
+      } catch (error) {
+        searchResults = [];
+        renderResults([]);
+        document.getElementById("export-button").disabled = true;
+        setStatus("search-status", error.message, "error");
+      }
+    }
+
+    async function exportResults() {
+      const filters = getFilters();
+      if (!filters.length) {
+        setStatus("search-status", "Нет фильтров для экспорта.", "error");
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filters }),
+        });
+        if (!response.ok) {
+          throw new Error("Не удалось сформировать Excel");
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "search_results.xlsx";
+        link.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        setStatus("search-status", error.message, "error");
+      }
+    }
+
+    async function clearData(kind) {
+      if (!confirm(`Очистить данные ${kind === "file1" ? "Файла 1" : "Файла 2"}?`)) {
+        return;
+      }
+
+      try {
+        await fetchJson(`/api/data/${kind}`, { method: "DELETE" });
+        setStatus("data-status", "Данные очищены.", "success");
+        if (kind === "file2") {
+          document.getElementById("characteristics-list").innerHTML = "";
+        }
+        await loadStats();
+      } catch (error) {
+        setStatus("data-status", error.message, "error");
+      }
+    }
+
+    document.querySelectorAll(".tab-button").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".tab-button").forEach((node) => node.classList.remove("active"));
+        document.querySelectorAll(".tab-panel").forEach((node) => node.classList.remove("active"));
+        button.classList.add("active");
+        document.getElementById(`tab-${button.dataset.tab}`).classList.add("active");
+      });
+    });
+
+    document.querySelectorAll(".dropzone").forEach((zone) => {
+      const kind = zone.dataset.upload;
+      const input = zone.querySelector(".file-input");
+      const trigger = zone.querySelector(".choose-file");
+
+      trigger.addEventListener("click", () => input.click());
+      input.addEventListener("change", () => {
+        if (input.files?.[0]) {
+          handleUpload(kind, input.files[0]);
+          input.value = "";
+        }
+      });
+
+      ["dragenter", "dragover"].forEach((eventName) => {
+        zone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          zone.classList.add("dragover");
+        });
+      });
+
+      ["dragleave", "drop"].forEach((eventName) => {
+        zone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          zone.classList.remove("dragover");
+        });
+      });
+
+      zone.addEventListener("drop", (event) => {
+        const file = event.dataTransfer?.files?.[0];
+        if (file) {
+          handleUpload(kind, file);
+        }
+      });
+    });
+
+    document.getElementById("add-filter").addEventListener("click", () => {
+      document.getElementById("filters").appendChild(createFilterRow());
+    });
+    document.getElementById("search-button").addEventListener("click", runSearch);
+    document.getElementById("reset-button").addEventListener("click", () => {
+      document.getElementById("filters").innerHTML = "";
+      document.getElementById("filters").appendChild(createFilterRow());
+      searchResults = [];
+      renderResults([]);
+      document.getElementById("export-button").disabled = true;
+      setStatus("search-status", "");
+    });
+    document.getElementById("export-button").addEventListener("click", exportResults);
+    document.getElementById("refresh-stats").addEventListener("click", loadStats);
+    document.getElementById("clear-file1").addEventListener("click", () => clearData("file1"));
+    document.getElementById("clear-file2").addEventListener("click", () => clearData("file2"));
+
+    document.getElementById("filters").appendChild(createFilterRow());
+    loadCharacteristics();
+    loadStats();
+  </script>
+</body>
+</html>
