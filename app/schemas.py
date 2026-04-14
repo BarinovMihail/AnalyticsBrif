@@ -39,8 +39,7 @@ class SearchResultItem(BaseModel):
     card_guid: str
     card_nomenclature: str | None = None
     manufacturer_inn: str | None = None
-    supplier_inn: str | None = None
-    supplier_site: str | None = None
+    supplier_name: str | None = None
     contract_date: date | None = None
     price: float | None = None
     currency: str | None = None

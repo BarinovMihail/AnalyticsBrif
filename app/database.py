@@ -33,7 +33,10 @@ Base = declarative_base()
 def ensure_optional_columns() -> None:
     inspector = inspect(engine)
     table_columns = {
-        "supplier_entries": {"manufacturer_identifier_type": "VARCHAR(10) NULL"},
+        "supplier_entries": {
+            "manufacturer_identifier_type": "VARCHAR(10) NULL",
+            "supplier_name": "VARCHAR(500) NULL",
+        },
         "mtr_cards": {"manufacturer_identifier_type": "VARCHAR(10) NULL"},
     }
 

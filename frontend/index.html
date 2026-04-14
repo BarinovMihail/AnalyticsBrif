@@ -399,13 +399,12 @@
                 <th>Наименование</th>
                 <th>ИНН изготовителя</th>
                 <th>Поставщик</th>
-                <th>ИНН поставщика</th>
                 <th>Дата контракта</th>
                 <th>Цена</th>
               </tr>
             </thead>
             <tbody id="results-body">
-              <tr><td colspan="6" class="muted">Результаты появятся после запуска поиска.</td></tr>
+              <tr><td colspan="5" class="muted">Результаты появятся после запуска поиска.</td></tr>
             </tbody>
           </table>
         </div>
@@ -523,7 +522,7 @@
       count.textContent = `Найдено конкурентов: ${results.length}`;
 
       if (!results.length) {
-        body.innerHTML = '<tr><td colspan="6" class="muted">Совпадений не найдено.</td></tr>';
+        body.innerHTML = '<tr><td colspan="5" class="muted">Совпадений не найдено.</td></tr>';
         return;
       }
 
@@ -533,8 +532,7 @@
         resultRow.innerHTML = `
           <td data-label="Наименование">${item.card_nomenclature || "—"}</td>
           <td data-label="ИНН изготовителя">${item.manufacturer_inn || "—"}</td>
-          <td data-label="Поставщик">${item.supplier_site || "—"}</td>
-          <td data-label="ИНН поставщика">${item.supplier_inn || "—"}</td>
+          <td data-label="Поставщик">${item.supplier_name || "—"}</td>
           <td data-label="Дата контракта">${formatDate(item.contract_date)}</td>
           <td data-label="Цена">${item.price ?? "—"}</td>
         `;
@@ -542,7 +540,7 @@
         const detailsRow = document.createElement("tr");
         detailsRow.className = "details-row";
         const detailsCell = document.createElement("td");
-        detailsCell.colSpan = 6;
+        detailsCell.colSpan = 5;
 
         const detailsBox = document.createElement("div");
         detailsBox.className = "details-box";

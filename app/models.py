@@ -37,6 +37,7 @@ class SupplierEntry(Base):
     manufacturer_identifier_type: Mapped[str | None] = mapped_column(String(10))
     supplier_inn: Mapped[str | None] = mapped_column(String(255))
     manufacturer_name: Mapped[str | None] = mapped_column(String(500))
+    supplier_name: Mapped[str | None] = mapped_column(String(500))
     price: Mapped[float | None] = mapped_column(DECIMAL(15, 2))
     currency: Mapped[str | None] = mapped_column(String(255))
     quantity: Mapped[int | None] = mapped_column(Integer)
