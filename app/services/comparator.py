@@ -77,11 +77,11 @@ def search_cards(db: Session, filters: list[SearchFilter]) -> list[dict]:
     if not matched_card_ids:
         return []
 
-    cards = db.execute(
+    card_supplier_rows = db.execute(
         select(MTRCard, SupplierEntry)
-        .join(SupplierEntry, SupplierEntry.manufacturer_inn == MTRCard.manufacturer_inn)
+        .outerjoin(SupplierEntry, SupplierEntry.manufacturer_inn == MTRCard.manufacturer_inn)
         .where(MTRCard.id.in_(matched_card_ids))
-        .order_by(SupplierEntry.contract_date.desc())
+        .order_by(MTRCard.id.asc(), SupplierEntry.contract_date.desc(), SupplierEntry.id.desc())
     ).all()
 
     all_characteristics_rows = db.execute(
@@ -95,8 +95,17 @@ def search_cards(db: Session, filters: list[SearchFilter]) -> list[dict]:
     for row in all_characteristics_rows:
         all_characteristics_by_card.setdefault(row.card_id, {})[row.char_name] = row.char_value
 
+    cards_by_id: dict[int, MTRCard] = {}
+    freshest_supplier_by_card_id: dict[int, SupplierEntry | None] = {}
+    for card, supplier in card_supplier_rows:
+        cards_by_id.setdefault(card.id, card)
+        if card.id not in freshest_supplier_by_card_id:
+            freshest_supplier_by_card_id[card.id] = supplier
+
     results = []
-    for card, supplier in cards:
+    for card_id in sorted(cards_by_id):
+        card = cards_by_id[card_id]
+        supplier = freshest_supplier_by_card_id.get(card_id)
         matched_characteristics = matched_values_by_card.get(card.id, {})
         if len(matched_characteristics) != len(filters):
             continue
@@ -105,11 +114,12 @@ def search_cards(db: Session, filters: list[SearchFilter]) -> list[dict]:
                 "card_guid": card.guid,
                 "card_nomenclature": card.nomenclature_name,
                 "manufacturer_inn": card.manufacturer_inn,
-                "supplier_inn": supplier.supplier_inn,
-                "supplier_site": supplier.supplier_site,
-                "contract_date": supplier.contract_date,
-                "price": float(supplier.price) if supplier.price is not None else None,
-                "currency": supplier.currency,
+                "manufacturer_name": supplier.manufacturer_name if supplier else None,
+                "supplier_inn": supplier.supplier_inn if supplier else None,
+                "supplier_site": supplier.supplier_site if supplier else None,
+                "contract_date": supplier.contract_date if supplier else None,
+                "price": float(supplier.price) if supplier and supplier.price is not None else None,
+                "currency": supplier.currency if supplier else None,
                 "matched_characteristics": matched_characteristics,
                 "all_characteristics": all_characteristics_by_card.get(card.id, {}),
             }
@@ -122,29 +132,43 @@ def export_search_results(results: list[dict], filters: list[SearchFilter]) -> B
     sheet = workbook.active
     sheet.title = "Results"
 
+    filter_names = [search_filter.char_name for search_filter in filters]
+    additional_characteristics = sorted(
+        {
+            char_name
+            for result in results
+            for char_name in result.get("all_characteristics", {})
+            if char_name not in filter_names
+        }
+    )
+
     headers = [
         "Наименование карточки",
         "ИНН изготовителя",
+        "Наименование изготовителя",
         "Поставщик (сайт)",
         "ИНН поставщика",
         "Дата контракта",
         "Цена",
         "Валюта",
-    ] + [search_filter.char_name for search_filter in filters]
+    ] + filter_names + additional_characteristics
     sheet.append(headers)
 
     for result in results:
         row = [
             result["card_nomenclature"],
             result["manufacturer_inn"],
+            result.get("manufacturer_name"),
             result["supplier_site"],
             result["supplier_inn"],
             result["contract_date"].isoformat() if result["contract_date"] else None,
             result["price"],
             result["currency"],
         ]
-        for search_filter in filters:
-            row.append(result["matched_characteristics"].get(search_filter.char_name))
+        for char_name in filter_names:
+            row.append(result["matched_characteristics"].get(char_name))
+        for char_name in additional_characteristics:
+            row.append(result["all_characteristics"].get(char_name))
         sheet.append(row)
 
     output = BytesIO()
