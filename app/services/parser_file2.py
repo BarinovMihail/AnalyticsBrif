@@ -38,6 +38,13 @@ def _normalize_text(value: object) -> str | None:
     return normalize_text(value)
 
 
+def _clean_char_name(value: str | None) -> str | None:
+    if not value:
+        return value
+    cut = re.split(r"\s+тип\s+данных", value, maxsplit=1, flags=re.IGNORECASE)
+    return cut[0].strip() if cut else value.strip()
+
+
 def _to_float(value: str) -> float | None:
     try:
         return float(value.replace(" ", "").replace(",", "."))
@@ -269,7 +276,7 @@ def _import_tabular_file2(db: Session, workbook) -> dict:
             for index in characteristic_indexes:
                 if index >= len(values):
                     continue
-                char_name = _normalize_text(headers[index])
+                char_name = _clean_char_name(_normalize_text(headers[index]))
                 raw_value = _normalize_text(values[index])
                 if not char_name or not raw_value:
                     continue
@@ -346,7 +353,7 @@ def import_file2(db: Session, file_path: str | Path) -> dict:
             if len(values) < 2:
                 raise ValueError("Строка характеристики должна содержать char_name и char_value")
 
-            char_name = values[0]
+            char_name = _clean_char_name(values[0])
             char_value, numeric_value, range_min, range_max = _parse_characteristic_value(values[1])
             current_card.characteristics.append(
                 CardCharacteristic(
