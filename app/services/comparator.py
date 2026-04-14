@@ -46,7 +46,6 @@ def search_cards(db: Session, filters: list[SearchFilter]) -> list[dict]:
         return []
 
     matched_card_ids: set[int] | None = None
-    matched_values_by_card: dict[int, dict[str, str]] = {}
 
     for search_filter in filters:
         not_null_condition, condition = _build_condition(search_filter)
@@ -71,11 +70,23 @@ def search_cards(db: Session, filters: list[SearchFilter]) -> list[dict]:
         if not matched_card_ids:
             return []
 
-        for row in rows:
-            matched_values_by_card.setdefault(row.card_id, {})[row.char_name] = row.char_value
-
     if not matched_card_ids:
         return []
+
+    filter_names = [search_filter.char_name for search_filter in filters]
+    matched_characteristics_rows = db.execute(
+        select(
+            CardCharacteristic.card_id,
+            CardCharacteristic.char_name,
+            CardCharacteristic.char_value,
+        ).where(
+            CardCharacteristic.card_id.in_(matched_card_ids),
+            CardCharacteristic.char_name.in_(filter_names),
+        )
+    ).all()
+    matched_values_by_card: dict[int, dict[str, str]] = {}
+    for row in matched_characteristics_rows:
+        matched_values_by_card.setdefault(row.card_id, {})[row.char_name] = row.char_value
 
     card_supplier_rows = db.execute(
         select(MTRCard, SupplierEntry)
@@ -107,8 +118,6 @@ def search_cards(db: Session, filters: list[SearchFilter]) -> list[dict]:
         card = cards_by_id[card_id]
         supplier = freshest_supplier_by_card_id.get(card_id)
         matched_characteristics = matched_values_by_card.get(card.id, {})
-        if len(matched_characteristics) != len(filters):
-            continue
         results.append(
             {
                 "card_guid": card.guid,
