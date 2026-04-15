@@ -9,6 +9,9 @@ import pandas as pd
 
 INIO_FROM_NAME_RE = re.compile(r"\(ИНИО\s*([^\)]+)\)", re.IGNORECASE)
 
+# Допустимые длины ИНН: 10 — юрлицо, 12 — физлицо/ИП
+_INN_LENGTHS = (10, 12)
+
 
 def normalize_text(value: object) -> str | None:
     if value is None:
@@ -20,6 +23,28 @@ def normalize_text(value: object) -> str | None:
         pass
     text = str(value).strip()
     return text or None
+
+
+def _pad_inn(digits: str) -> str | None:
+    """Дополняет цифровую строку ведущими нулями до стандартной длины ИНН.
+
+    Excel хранит ИНН как число и теряет ведущие нули (0274173735 → 274173735).
+    Если строка короче допустимой длины на 1-2 символа, дополняем нулями.
+    Возвращает None, если длину восстановить невозможно.
+    """
+    if not digits.isdigit():
+        return None
+    length = len(digits)
+    if length in _INN_LENGTHS:
+        return digits
+    # Пробуем дополнить до ближайшей стандартной длины
+    for target in _INN_LENGTHS:
+        if length < target:
+            padded = digits.zfill(target)
+            # Убеждаемся, что не добавили слишком много нулей
+            if len(padded) == target:
+                return padded
+    return None
 
 
 def normalize_inn(value: object) -> str | None:
@@ -52,9 +77,7 @@ def normalize_inn(value: object) -> str | None:
         except InvalidOperation:
             digits = re.sub(r"\D", "", text)
 
-    if digits.isdigit() and len(digits) in (10, 12):
-        return digits
-    return None
+    return _pad_inn(digits)
 
 
 def extract_identifier(inn_value, name_value=None, inio_value=None) -> dict[str, str | None]:
