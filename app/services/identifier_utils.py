@@ -7,7 +7,7 @@ from decimal import Decimal, InvalidOperation
 import pandas as pd
 
 
-INIO_FROM_NAME_RE = re.compile(r"\(ИНИО\s+([^\)]+)\)", re.IGNORECASE)
+INIO_FROM_NAME_RE = re.compile(r"\(ИНИО\s*([^\)]+)\)", re.IGNORECASE)
 
 
 def normalize_text(value: object) -> str | None:

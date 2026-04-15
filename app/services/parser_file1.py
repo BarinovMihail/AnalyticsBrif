@@ -160,12 +160,13 @@ def import_file1(db: Session, file_path: str | Path) -> dict:
     rows = dataframe.iloc[4:] if file_format == "brif_registry" else dataframe.iloc[3:]
 
     existing_keys = {
-        (manufacturer_inn, nomenclature_name, contract_date)
-        for manufacturer_inn, nomenclature_name, contract_date in db.execute(
+        (manufacturer_inn, nomenclature_name, contract_date, supplier_name)
+        for manufacturer_inn, nomenclature_name, contract_date, supplier_name in db.execute(
             select(
                 SupplierEntry.manufacturer_inn,
                 SupplierEntry.nomenclature_name,
                 SupplierEntry.contract_date,
+                SupplierEntry.supplier_name,
             )
         ).all()
     }
@@ -202,7 +203,12 @@ def import_file1(db: Session, file_path: str | Path) -> dict:
                     excel_row,
                 )
 
-            duplicate_key = (manufacturer_inn, nomenclature_name, parsed_row["contract_date"])
+            duplicate_key = (
+                manufacturer_inn,
+                nomenclature_name,
+                parsed_row["contract_date"],
+                parsed_row["supplier_name"],
+            )
             if duplicate_key in existing_keys:
                 skipped += 1
                 continue
