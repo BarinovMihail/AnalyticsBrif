@@ -698,6 +698,10 @@
           <div class="prep-step">
             <div class="step-num">1</div>
             <span class="step-label">Откройте каталог продукции:</span>
+            <div class="tooltip-wrap">
+              <button class="tooltip-btn" aria-label="Предупреждение по загрузке файла характеристик">!</button>
+              <div class="tooltip-box">Файл с характеристиками с сайта Росатом может загружаться долго, иногда около 5 минут. Если ожидание слишком долгое, уменьшите количество строк в выгрузке.</div>
+            </div>
             <a class="rosatom-link"
                href="https://zakupki.rosatom.ru/lk/ZgMtPnRMRdEevlgPoWPjSvHQ/BmgymtUuqyEeueLfoWPjSvHQ/Bl4Zp8oFIGEe6AHfoWPsQNcA?id=4Zp8oFIGEe6AHfoWPsQNcA&type=%D0%A1%D0%BF%D1%80%D0%B0%D0%B2%D0%BE%D1%87%D0%BD%D0%B8%D0%BA&view=%D0%93%D0%90_%D0%9A%D0%B0%D1%82%D0%B0%D0%BB%D0%BE%D0%B3%D0%9F%D1%80%D0%BE%D0%B4%D1%83%D0%BA%D1%86%D0%B8%D0%B8&group=%D0%A1%D0%BF%D0%B8%D1%81%D0%BE%D0%BA&page=1&count=1000"
                target="_blank" rel="noopener noreferrer">
@@ -769,10 +773,6 @@
             <p class="muted">или</p>
             <button type="button" class="secondary choose-file">Выбрать файл</button>
             <input class="hidden file-input" type="file" accept=".xlsx">
-          </div>
-          <div class="notice">
-            Загрузка файла с характеристиками может занимать около 5 минут.
-            Если ожидание слишком долгое, уменьшите количество строк в выгрузке и попробуйте снова.
           </div>
           <div id="status-file2" class="status"></div>
         </div>
