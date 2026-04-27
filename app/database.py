@@ -5,10 +5,11 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 
-load_dotenv()
+# override=False: Docker env vars take priority over .env file
+load_dotenv(override=False)
 
 
-DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_HOST = os.getenv("DB_HOST", "db")
 DB_PORT = os.getenv("DB_PORT", "3306")
 DB_NAME = os.getenv("DB_NAME", "brifdb")
 DB_USER = os.getenv("DB_USER", "root")
