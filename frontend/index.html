@@ -504,6 +504,16 @@
     .status.success { color: var(--success); }
     .status.error   { color: var(--danger); }
 
+    .notice {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #fff3e0;
+      border: 1px solid #efc48f;
+      color: #7a3310;
+      line-height: 1.45;
+    }
+
     .meta {
       display: flex;
       justify-content: space-between;
@@ -759,6 +769,10 @@
             <p class="muted">или</p>
             <button type="button" class="secondary choose-file">Выбрать файл</button>
             <input class="hidden file-input" type="file" accept=".xlsx">
+          </div>
+          <div class="notice">
+            Загрузка файла с характеристиками может занимать около 5 минут.
+            Если ожидание слишком долгое, уменьшите количество строк в выгрузке и попробуйте снова.
           </div>
           <div id="status-file2" class="status"></div>
         </div>
