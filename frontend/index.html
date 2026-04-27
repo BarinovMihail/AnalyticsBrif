@@ -328,31 +328,7 @@
       background: #fff0df;
     }
 
-    /* ── Блок классификатора МТР в поиске ── */
-    .mtr-info-bar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: #fff8ee;
-      border: 1px solid #ead5bc;
-      border-radius: 14px;
-      padding: 11px 16px;
-      margin-bottom: 18px;
-      flex-wrap: wrap;
-    }
 
-    .mtr-info-bar .mtr-label {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--muted);
-      white-space: nowrap;
-    }
-
-    .mtr-info-bar .mtr-name {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--ink);
-    }
 
     /* ── Модальное окно ── */
     .modal-overlay {
@@ -799,16 +775,6 @@
           </div>
         </div>
 
-        <!-- Строка с кодом классификатора -->
-        <div class="mtr-info-bar">
-          <span class="mtr-label">Классификатор МТР:</span>
-          <div class="code-copy-row">
-            <span class="code-val" id="search-code">18010107</span>
-            <span style="font-size:13px; color:var(--muted);">— Клапаны запорные</span>
-            <button class="copy-btn" id="search-copy-btn">Копировать</button>
-            <span class="copy-confirm" id="search-copy-confirm">✓ Скопировано</span>
-          </div>
-        </div>
 
         <div id="search-form" class="search-form"></div>
 
@@ -966,7 +932,6 @@
     }
 
     setupCopyBtn('prep-copy-btn',   'prep-code',   'prep-copy-confirm');
-    setupCopyBtn('search-copy-btn', 'search-code', 'search-copy-confirm');
 
     // ── Утилиты ──
     function setStatus(elementId, message, type = '') {
