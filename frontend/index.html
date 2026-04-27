@@ -419,10 +419,24 @@
       text-align: center;
     }
 
-    .modal-body img {
+    /* GIF — кликабельный, с подсказкой */
+    .modal-body img.gif-preview {
       max-width: 100%;
       border-radius: 12px;
       border: 1px solid var(--line);
+      cursor: zoom-in;
+      transition: box-shadow .2s ease, transform .2s ease;
+    }
+
+    .modal-body img.gif-preview:hover {
+      box-shadow: 0 8px 28px rgba(77,51,24,0.22);
+      transform: scale(1.01);
+    }
+
+    .gif-hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
     }
 
     .gif-fallback {
@@ -435,6 +449,51 @@
       font-size: 14px;
       line-height: 1.6;
     }
+
+    /* ── Лайтбокс (полноэкранный просмотр GIF) ── */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: rgba(10, 5, 2, 0.92);
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+      animation: fadeIn .18s ease;
+    }
+
+    .lightbox.open { display: flex; }
+
+    .lightbox img {
+      max-width: 95vw;
+      max-height: 95vh;
+      border-radius: 10px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.7);
+      pointer-events: none;
+      object-fit: contain;
+    }
+
+    .lightbox-close {
+      position: fixed;
+      top: 18px;
+      right: 22px;
+      background: rgba(255,255,255,0.15);
+      border: none;
+      color: #fff;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      font-size: 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .15s ease;
+      z-index: 2001;
+    }
+
+    .lightbox-close:hover { background: rgba(255,255,255,0.3); }
 
     /* ── Остальные стили ── */
     button, input { font: inherit; }
@@ -579,6 +638,12 @@
 </head>
 <body>
 
+  <!-- ═══════════ ЛАЙТБОКС ═══════════ -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-label="Просмотр изображения">
+    <button class="lightbox-close" id="lightbox-close" aria-label="Закрыть">✕</button>
+    <img id="lightbox-img" src="" alt="">
+  </div>
+
   <!-- ═══════════ МОДАЛЬНЫЕ ОКНА ═══════════ -->
 
   <div class="modal-overlay" id="modal-upload">
@@ -588,9 +653,10 @@
         <button class="modal-close" data-close="modal-upload" aria-label="Закрыть">✕</button>
       </div>
       <div class="modal-body">
-        <img src="/frontend/Загрузка фалов.gif"
+        <img class="gif-preview" src="/frontend/Загрузка фалов.gif"
              alt="Инструкция по загрузке файлов"
              onerror="this.style.display='none'; document.getElementById('fallback-upload').style.display='block'">
+        <p class="gif-hint">🔍 Нажмите на изображение, чтобы открыть на весь экран</p>
         <div class="gif-fallback" id="fallback-upload">
           Файл <strong>«Загрузка фалов.gif»</strong> не найден.<br>
           Убедитесь, что GIF находится в папке <code>frontend/</code>.
@@ -606,9 +672,10 @@
         <button class="modal-close" data-close="modal-params" aria-label="Закрыть">✕</button>
       </div>
       <div class="modal-body">
-        <img src="/frontend/Ввод параметров.gif"
+        <img class="gif-preview" src="/frontend/Ввод параметров.gif"
              alt="Инструкция по вводу параметров"
              onerror="this.style.display='none'; document.getElementById('fallback-params').style.display='block'">
+        <p class="gif-hint">🔍 Нажмите на изображение, чтобы открыть на весь экран</p>
         <div class="gif-fallback" id="fallback-params">
           Файл <strong>«Ввод параметров.gif»</strong> не найден.<br>
           Убедитесь, что GIF находится в папке <code>frontend/</code>.
@@ -707,7 +774,7 @@
             <h2>Файл 2</h2>
             <div class="tooltip-wrap">
               <button class="tooltip-btn" aria-label="Что загружать в Файл 2">?</button>
-              <div class="tooltip-box">Карточки МТР с характеристиками.<br>«Клапаны запорные.xlsx»</div>
+              <div class="tooltip-box">Карточки МТР с характеристиками.<br>"Клапаны запорные.xlsx"</div>
             </div>
           </div>
           <p class="muted">Карточки МТР с характеристиками и ИНН изготовителей.</p>
@@ -833,6 +900,40 @@
 
     let searchResults = [];
 
+    // ── Лайтбокс ──
+    const lightbox    = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightbox-img');
+
+    function openLightbox(src, alt) {
+      lightboxImg.src = src;
+      lightboxImg.alt = alt || '';
+      lightbox.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      lightbox.classList.remove('open');
+      lightboxImg.src = '';
+      document.body.style.overflow = '';
+    }
+
+    document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+    lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox(); });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closeLightbox();
+        document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+      }
+    });
+
+    // Назначить лайтбокс всем .gif-preview
+    document.querySelectorAll('img.gif-preview').forEach(img => {
+      img.addEventListener('click', () => {
+        if (img.style.display !== 'none') openLightbox(img.src, img.alt);
+      });
+    });
+
     // ── Модальные окна ──
     document.querySelectorAll('[data-open]').forEach(btn => {
       btn.addEventListener('click', () =>
@@ -850,11 +951,6 @@
       overlay.addEventListener('click', e => {
         if (e.target === overlay) overlay.classList.remove('open');
       });
-    });
-
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape')
-        document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
     });
 
     // ── Копирование кода МТР ──
