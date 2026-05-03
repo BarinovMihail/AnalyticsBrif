@@ -229,6 +229,7 @@ def import_file1(db: Session, file_path: str | Path) -> dict:
         excel_row = row_index + 1
         try:
             if _is_effectively_empty_row(row):
+                logger.info("Строка %s пропущена: пустая строка", excel_row)
                 skipped += 1
                 continue
 
@@ -259,6 +260,13 @@ def import_file1(db: Session, file_path: str | Path) -> dict:
                 parsed_row["contract_date"],
             )
             if duplicate_key in existing_keys:
+                logger.info(
+                    "Строка %s пропущена: дубль по ключу ИНН изготовителя=%r, номенклатура=%r, дата контракта=%r",
+                    excel_row,
+                    manufacturer_inn,
+                    nomenclature_name,
+                    parsed_row["contract_date"],
+                )
                 skipped += 1
                 continue
 

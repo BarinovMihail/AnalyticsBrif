@@ -810,13 +810,14 @@
               <tr>
                 <th>Наименование</th>
                 <th>ИНН/ИНИО изготовителя</th>
+                <th>Наименование изготовителя</th>
                 <th>Поставщик</th>
                 <th>Дата контракта</th>
                 <th>Цена</th>
               </tr>
             </thead>
             <tbody id="results-body">
-              <tr><td colspan="5" class="muted">Результаты появятся после запуска поиска.</td></tr>
+              <tr><td colspan="6" class="muted">Результаты появятся после запуска поиска.</td></tr>
             </tbody>
           </table>
         </div>
@@ -991,7 +992,7 @@
       body.innerHTML = '';
       count.textContent = `\u041d\u0430\u0439\u0434\u0435\u043d\u043e \u043a\u043e\u043d\u043a\u0443\u0440\u0435\u043d\u0442\u043e\u0432: ${results.length}`;
       if (!results.length) {
-        body.innerHTML = '<tr><td colspan="5" class="muted">\u0421\u043e\u0432\u043f\u0430\u0434\u0435\u043d\u0438\u0439 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e.</td></tr>';
+        body.innerHTML = '<tr><td colspan="6" class="muted">\u0421\u043e\u0432\u043f\u0430\u0434\u0435\u043d\u0438\u0439 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e.</td></tr>';
         return;
       }
       results.forEach(item => {
@@ -1000,6 +1001,7 @@
         resultRow.innerHTML = `
           <td data-label="\u041d\u0430\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u0435">${item.card_nomenclature || '\u2014'}</td>
           <td data-label="\u0418\u041d\u041d \u0438\u0437\u0433\u043e\u0442\u043e\u0432\u0438\u0442\u0435\u043b\u044f">${item.manufacturer_inn || '\u2014'}</td>
+          <td data-label="\u041d\u0430\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u0435 \u0438\u0437\u0433\u043e\u0442\u043e\u0432\u0438\u0442\u0435\u043b\u044f">${item.manufacturer_name || '\u2014'}</td>
           <td data-label="\u041f\u043e\u0441\u0442\u0430\u0432\u0449\u0438\u043a">${item.supplier_name || '\u2014'}</td>
           <td data-label="\u0414\u0430\u0442\u0430 \u043a\u043e\u043d\u0442\u0440\u0430\u043a\u0442\u0430">${formatDate(item.contract_date)}</td>
           <td data-label="\u0426\u0435\u043d\u0430">${item.price ?? '\u2014'}</td>
@@ -1007,7 +1009,7 @@
         const detailsRow  = document.createElement('tr');
         detailsRow.className = 'details-row';
         const detailsCell = document.createElement('td');
-        detailsCell.colSpan = 5;
+        detailsCell.colSpan = 6;
         const detailsBox  = document.createElement('div');
         detailsBox.className = 'details-box';
         const characteristics = Object.entries(item.all_characteristics || {});
