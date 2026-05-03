@@ -19,6 +19,20 @@ logger = logging.getLogger(__name__)
 
 DATE_DDMMYYYY_RE = re.compile(r"(\d{2}\.\d{2}\.\d{4})")
 EMAIL_RE = re.compile(r"([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})", re.IGNORECASE)
+BRIF_HEADER_ROW_INDEX = 3
+
+BRIF_PRODUCT_COLUMN = "Наименование продукции"
+BRIF_SUPPLIER_COLUMN = "Наименование поставщика"
+BRIF_OKPD2_COLUMN = "Классификатор ОКПД2"
+BRIF_MTR_CLASS_COLUMN = "Классификатор МТРИО"
+BRIF_STATUS_COLUMN = "Статус продукции"
+BRIF_PRICE_COLUMN = "Цена EXW без НДС"
+BRIF_DELIVERY_DATE_COLUMN = "Дата окончания действия цены"
+BRIF_CONTRACT_DATE_COLUMN = "Дата начала действия цены"
+BRIF_UPDATE_DATE_COLUMN = "Дата обновления"
+BRIF_CURRENCY_COLUMN = "Валюта"
+BRIF_MANUFACTURER_COLUMN = "Наименование изготовителя"
+BRIF_MANUFACTURER_INN_COLUMN = "ИНН изготовителя"
 
 
 def _normalize_text(value: object) -> str | None:
@@ -55,6 +69,14 @@ def _parse_date(value: object, fmt: str = "%d.%m.%Y") -> date | None:
         return datetime.strptime(text, fmt).date()
     except ValueError:
         return None
+
+
+def _extract_date(value: object) -> date | None:
+    text = _normalize_text(value)
+    if not text:
+        return None
+    match = DATE_DDMMYYYY_RE.search(text)
+    return _parse_date(match.group(1)) if match else _parse_date(text)
 
 
 def _split_contract_and_site(value: object) -> tuple[date | None, str | None]:
@@ -105,12 +127,29 @@ def _is_effectively_empty_row(row) -> bool:
 
 
 def _detect_file1_format(dataframe: pd.DataFrame) -> str:
-    if len(dataframe) > 3:
-        header_row = dataframe.iloc[3].tolist()
+    if len(dataframe) > BRIF_HEADER_ROW_INDEX:
+        header_row = dataframe.iloc[BRIF_HEADER_ROW_INDEX].tolist()
         normalized_header = [_normalize_text(cell) for cell in header_row]
-        if "Наименование продукции" in normalized_header and "ИНН изготовителя" in normalized_header:
+        if BRIF_PRODUCT_COLUMN in normalized_header and BRIF_MANUFACTURER_INN_COLUMN in normalized_header:
             return "brif_registry"
     return "legacy"
+
+
+def _build_header_map(dataframe: pd.DataFrame, header_row_index: int) -> dict[str, int]:
+    if len(dataframe) <= header_row_index:
+        return {}
+    return {
+        header: index
+        for index, value in enumerate(dataframe.iloc[header_row_index].tolist())
+        if (header := _normalize_text(value))
+    }
+
+
+def _row_value(row, columns: dict[str, int], column_name: str) -> object | None:
+    index = columns.get(column_name)
+    if index is None or index >= len(row):
+        return None
+    return row.iloc[index]
 
 
 def _parse_legacy_row(row) -> dict:
@@ -134,39 +173,50 @@ def _parse_legacy_row(row) -> dict:
     }
 
 
-def _parse_brif_registry_row(row) -> dict:
-    identifier = extract_identifier(row.iloc[17], name_value=row.iloc[16])
+def _parse_brif_registry_row(row, columns: dict[str, int]) -> dict:
+    manufacturer_name = _row_value(row, columns, BRIF_MANUFACTURER_COLUMN)
+    status = _row_value(row, columns, BRIF_STATUS_COLUMN)
+    supplier_name = _normalize_text(_row_value(row, columns, BRIF_SUPPLIER_COLUMN))
+    contract_date = (
+        _parse_date(_row_value(row, columns, BRIF_CONTRACT_DATE_COLUMN))
+        or _extract_date(status)
+        or _parse_date(_row_value(row, columns, BRIF_UPDATE_DATE_COLUMN))
+    )
+    identifier = extract_identifier(
+        _row_value(row, columns, BRIF_MANUFACTURER_INN_COLUMN),
+        name_value=manufacturer_name,
+    )
     return {
-        "nomenclature_name": _normalize_text(row.iloc[1]),
-        "okpd2_code": _extract_okpd2(row.iloc[4]),
-        "mtr_class": _extract_mtr_class(row.iloc[5]),
-        "supplier_name": _normalize_text(row.iloc[3]),
-        "supplier_site": _extract_email(row.iloc[8]) or _normalize_text(row.iloc[3]),
+        "nomenclature_name": _normalize_text(_row_value(row, columns, BRIF_PRODUCT_COLUMN)),
+        "okpd2_code": _extract_okpd2(_row_value(row, columns, BRIF_OKPD2_COLUMN)),
+        "mtr_class": _extract_mtr_class(_row_value(row, columns, BRIF_MTR_CLASS_COLUMN)),
+        "supplier_name": supplier_name,
+        "supplier_site": _extract_email(status) or supplier_name,
         "manufacturer_inn": identifier["value"],
         "manufacturer_identifier_type": identifier["type"],
         "supplier_inn": None,
-        "manufacturer_name": _normalize_text(row.iloc[16]),
-        "price": _parse_decimal(row.iloc[9]),
-        "currency": _extract_currency(row.iloc[14]),
+        "manufacturer_name": _normalize_text(manufacturer_name),
+        "price": _parse_decimal(_row_value(row, columns, BRIF_PRICE_COLUMN)),
+        "currency": _extract_currency(_row_value(row, columns, BRIF_CURRENCY_COLUMN)),
         "quantity": None,
-        "contract_date": _parse_date(row.iloc[11]),
-        "delivery_date": _parse_date(row.iloc[10]),
+        "contract_date": contract_date,
+        "delivery_date": _parse_date(_row_value(row, columns, BRIF_DELIVERY_DATE_COLUMN)),
     }
 
 
 def import_file1(db: Session, file_path: str | Path) -> dict:
     dataframe = pd.read_excel(file_path, header=None, engine="openpyxl", dtype=object)
     file_format = _detect_file1_format(dataframe)
+    brif_columns = _build_header_map(dataframe, BRIF_HEADER_ROW_INDEX) if file_format == "brif_registry" else {}
     rows = dataframe.iloc[4:] if file_format == "brif_registry" else dataframe.iloc[3:]
 
     existing_keys = {
-        (manufacturer_inn, nomenclature_name, contract_date, supplier_name)
-        for manufacturer_inn, nomenclature_name, contract_date, supplier_name in db.execute(
+        (manufacturer_inn, nomenclature_name, contract_date)
+        for manufacturer_inn, nomenclature_name, contract_date in db.execute(
             select(
                 SupplierEntry.manufacturer_inn,
                 SupplierEntry.nomenclature_name,
                 SupplierEntry.contract_date,
-                SupplierEntry.supplier_name,
             )
         ).all()
     }
@@ -183,7 +233,7 @@ def import_file1(db: Session, file_path: str | Path) -> dict:
                 continue
 
             parsed_row = (
-                _parse_brif_registry_row(row)
+                _parse_brif_registry_row(row, brif_columns)
                 if file_format == "brif_registry"
                 else _parse_legacy_row(row)
             )
@@ -207,7 +257,6 @@ def import_file1(db: Session, file_path: str | Path) -> dict:
                 manufacturer_inn,
                 nomenclature_name,
                 parsed_row["contract_date"],
-                parsed_row["supplier_name"],
             )
             if duplicate_key in existing_keys:
                 skipped += 1
