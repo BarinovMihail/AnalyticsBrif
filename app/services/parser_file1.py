@@ -124,7 +124,7 @@ def _parse_legacy_row(row) -> dict:
         "supplier_site": supplier_site,
         "manufacturer_inn": identifier["value"],
         "manufacturer_identifier_type": identifier["type"],
-        "supplier_inn": _normalize_inn(row.iloc[12]),
+        "supplier_inn": normalize_inn(row.iloc[12]),
         "manufacturer_name": _normalize_text(row.iloc[10]),
         "price": _parse_decimal(row.iloc[6]),
         "currency": _normalize_text(row.iloc[8]),
