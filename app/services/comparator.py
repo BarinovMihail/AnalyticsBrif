@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import re
 from io import BytesIO
+from typing import Callable, Optional
 
 from openpyxl import Workbook
 from sqlalchemy import and_, delete, func, select
@@ -10,35 +12,96 @@ from app.models import CardCharacteristic, MTRCard, SupplierEntry
 from app.schemas import SearchFilter
 
 
-OPERATORS = {"eq", "eq_str", "gte", "lte", "range_max_gte", "range_max_lte"}
+OPERATORS = {
+    "eq",
+    "eq_str",
+    "gte",
+    "lte",
+    "range_max_gte",
+    "range_max_lte",
+    "contains_any_word",
+    "contains_all_words",
+}
+
+# Слово — непрерывная последовательность букв и цифр (без подчёркивания).
+# Любой прочий символ (пробел, запятая, точка с запятой, слэш и т.п.) считается разделителем
+# и не входит в состав слова.
+_TOKEN_RE = re.compile(r"[^\W_]+", re.UNICODE)
+
+
+def _tokenize(text: str | None) -> set[str]:
+    """Разбивает текст на множество слов (в нижнем регистре)."""
+    if not text:
+        return set()
+    return {match.group(0).lower() for match in _TOKEN_RE.finditer(text)}
 
 
 def _parse_float(value: str) -> float:
     return float(value.replace(",", ".").strip())
 
 
-def _build_condition(search_filter: SearchFilter):
+def _build_condition(
+    search_filter: SearchFilter,
+) -> tuple[Optional[object], object, Optional[Callable[[str], bool]]]:
+    """Возвращает (not_null_condition, sql_condition, post_filter).
+
+    Для операторов `contains_any_word` / `contains_all_words` SQL-условие выбирает
+    все строки по имени характеристики, а финальная проверка по словам выполняется
+    в Python через `post_filter`.
+    """
     operator = search_filter.operator
     if operator not in OPERATORS:
         raise ValueError(f"Неподдерживаемый оператор: {operator}")
 
     if operator == "eq":
         numeric_value = _parse_float(search_filter.value)
-        return CardCharacteristic.char_value_numeric.is_not(None), CardCharacteristic.char_value_numeric == numeric_value
+        return CardCharacteristic.char_value_numeric.is_not(None), CardCharacteristic.char_value_numeric == numeric_value, None
     if operator == "eq_str":
         normalized_value = search_filter.value.strip().lower()
-        return None, func.lower(CardCharacteristic.char_value) == normalized_value
+        return None, func.lower(CardCharacteristic.char_value) == normalized_value, None
     if operator == "gte":
         numeric_value = _parse_float(search_filter.value)
-        return CardCharacteristic.char_value_numeric.is_not(None), CardCharacteristic.char_value_numeric >= numeric_value
+        return CardCharacteristic.char_value_numeric.is_not(None), CardCharacteristic.char_value_numeric >= numeric_value, None
     if operator == "lte":
         numeric_value = _parse_float(search_filter.value)
-        return CardCharacteristic.char_value_numeric.is_not(None), CardCharacteristic.char_value_numeric <= numeric_value
+        return CardCharacteristic.char_value_numeric.is_not(None), CardCharacteristic.char_value_numeric <= numeric_value, None
     if operator == "range_max_gte":
         numeric_value = _parse_float(search_filter.value)
-        return CardCharacteristic.range_max.is_not(None), CardCharacteristic.range_max >= numeric_value
-    numeric_value = _parse_float(search_filter.value)
-    return CardCharacteristic.range_max.is_not(None), CardCharacteristic.range_max <= numeric_value
+        return CardCharacteristic.range_max.is_not(None), CardCharacteristic.range_max >= numeric_value, None
+    if operator == "range_max_lte":
+        numeric_value = _parse_float(search_filter.value)
+        return CardCharacteristic.range_max.is_not(None), CardCharacteristic.range_max <= numeric_value, None
+
+    query_tokens = _tokenize(search_filter.value)
+    if operator == "contains_any_word":
+        # Совпадение, если хотя бы одно слово из запроса присутствует в значении карточки.
+        def _post_filter_any(card_value: str) -> bool:
+            if not query_tokens:
+                return False
+            return bool(query_tokens & _tokenize(card_value))
+
+        # На уровне SQL дополнительно ограничиваем выборку: значение должно содержать
+        # хотя бы одно из слов запроса (с учётом регистра через LOWER).
+        like_clauses = [
+            func.lower(CardCharacteristic.char_value).like(f"%{token}%") for token in sorted(query_tokens)
+        ]
+        if not like_clauses:
+            return None, CardCharacteristic.char_value.is_(None), _post_filter_any
+        sql_condition = like_clauses[0]
+        for clause in like_clauses[1:]:
+            sql_condition = sql_condition | clause
+        return None, sql_condition, _post_filter_any
+
+    # operator == "contains_all_words"
+    # Совпадение, если каждое слово материала из карточки присутствует в запросе
+    # (порядок слов не важен, лишние слова в запросе допустимы).
+    def _post_filter_all(card_value: str) -> bool:
+        card_tokens = _tokenize(card_value)
+        if not card_tokens:
+            return False
+        return card_tokens.issubset(query_tokens)
+
+    return None, CardCharacteristic.char_value.is_not(None), _post_filter_all
 
 
 def search_cards(db: Session, filters: list[SearchFilter]) -> list[dict]:
@@ -48,7 +111,7 @@ def search_cards(db: Session, filters: list[SearchFilter]) -> list[dict]:
     matched_card_ids: set[int] | None = None
 
     for search_filter in filters:
-        not_null_condition, condition = _build_condition(search_filter)
+        not_null_condition, condition, post_filter = _build_condition(search_filter)
         conditions = [CardCharacteristic.char_name == search_filter.char_name, condition]
         if not_null_condition is not None:
             conditions.insert(1, not_null_condition)
@@ -61,7 +124,10 @@ def search_cards(db: Session, filters: list[SearchFilter]) -> list[dict]:
             ).where(and_(*conditions))
         ).all()
 
-        current_card_ids = {row.card_id for row in rows}
+        if post_filter is not None:
+            current_card_ids = {row.card_id for row in rows if post_filter(row.char_value)}
+        else:
+            current_card_ids = {row.card_id for row in rows}
         if matched_card_ids is None:
             matched_card_ids = current_card_ids
         else:
