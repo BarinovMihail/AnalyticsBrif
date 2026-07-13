@@ -224,6 +224,10 @@ def import_file1(db: Session, file_path: str | Path) -> dict:
     imported = 0
     skipped = 0
     errors: list[str] = []
+    skipped_rows: list[dict] = []
+
+    def _record_skip(row_num: int, reason: str, preview: dict[str, str] | None = None) -> None:
+        skipped_rows.append({"row": row_num, "reason": reason, "preview": preview or {}})
 
     for row_index, row in rows.iterrows():
         excel_row = row_index + 1
@@ -231,6 +235,7 @@ def import_file1(db: Session, file_path: str | Path) -> dict:
             if _is_effectively_empty_row(row):
                 logger.info("Строка %s пропущена: пустая строка", excel_row)
                 skipped += 1
+                _record_skip(excel_row, "Пустая строка")
                 continue
 
             parsed_row = (
@@ -246,6 +251,11 @@ def import_file1(db: Session, file_path: str | Path) -> dict:
             if not nomenclature_name:
                 logger.warning("Строка %s: отсутствует наименование номенклатуры, строка пропущена", excel_row)
                 skipped += 1
+                _record_skip(
+                    excel_row,
+                    "Отсутствует наименование номенклатуры",
+                    {"ИНН изготовителя": manufacturer_inn or "—"},
+                )
                 continue
 
             if not manufacturer_inn:
@@ -268,6 +278,15 @@ def import_file1(db: Session, file_path: str | Path) -> dict:
                     parsed_row["contract_date"],
                 )
                 skipped += 1
+                _record_skip(
+                    excel_row,
+                    "Дубликат по ключу (ИНН + номенклатура + дата)",
+                    {
+                        "ИНН изготовителя": manufacturer_inn or "—",
+                        "Номенклатура": nomenclature_name or "—",
+                        "Дата контракта": str(parsed_row["contract_date"] or "—"),
+                    },
+                )
                 continue
 
             db.add(
@@ -296,4 +315,4 @@ def import_file1(db: Session, file_path: str | Path) -> dict:
             errors.append(message)
 
     db.commit()
-    return {"imported": imported, "skipped": skipped, "errors": errors}
+    return {"imported": imported, "skipped": skipped, "errors": errors, "skipped_rows": skipped_rows}

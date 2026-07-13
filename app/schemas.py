@@ -3,10 +3,17 @@ from datetime import date
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class SkippedRow(BaseModel):
+    row: int
+    reason: str
+    preview: dict[str, str] = Field(default_factory=dict)
+
+
 class UploadResponse(BaseModel):
     imported: int
     skipped: int
     errors: list[str]
+    skipped_rows: list[SkippedRow] = Field(default_factory=list)
 
 
 class SupplierEntryListItem(BaseModel):

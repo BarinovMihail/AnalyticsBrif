@@ -239,6 +239,10 @@ def _import_tabular_file2(db: Session, workbook) -> dict:
     imported = 0
     skipped = 0
     errors: list[str] = []
+    skipped_rows: list[dict] = []
+
+    def _record_skip(row_num: int, reason: str, preview: dict[str, str] | None = None) -> None:
+        skipped_rows.append({"row": row_num, "reason": reason, "preview": preview or {}})
 
     for row_index, row in enumerate(sheet.iter_rows(min_row=4, values_only=True), start=4):
         values = list(row)
@@ -247,13 +251,16 @@ def _import_tabular_file2(db: Session, workbook) -> dict:
             if not guid:
                 if all(_normalize_text(value) is None for value in values):
                     skipped += 1
+                    _record_skip(row_index, "Пустая строка")
                     continue
                 logger.warning("Строка %s: отсутствует GUID, строка пропущена", row_index)
                 skipped += 1
+                _record_skip(row_index, "Отсутствует GUID")
                 continue
 
             if guid in existing_guids:
                 skipped += 1
+                _record_skip(row_index, "Дубликат GUID", {"GUID": guid})
                 continue
 
             manufacturer_name = None
@@ -300,7 +307,7 @@ def _import_tabular_file2(db: Session, workbook) -> dict:
             errors.append(message)
 
     db.commit()
-    return {"imported": imported, "skipped": skipped, "errors": errors}
+    return {"imported": imported, "skipped": skipped, "errors": errors, "skipped_rows": skipped_rows}
 
 
 def import_file2(db: Session, file_path: str | Path) -> dict:
@@ -314,6 +321,10 @@ def import_file2(db: Session, file_path: str | Path) -> dict:
     imported = 0
     skipped = 0
     errors: list[str] = []
+    skipped_rows: list[dict] = []
+
+    def _record_skip(row_num: int, reason: str, preview: dict[str, str] | None = None) -> None:
+        skipped_rows.append({"row": row_num, "reason": reason, "preview": preview or {}})
 
     current_card: MTRCard | None = None
 
@@ -339,6 +350,7 @@ def import_file2(db: Session, file_path: str | Path) -> dict:
                 guid = header["guid"]
                 if guid in existing_guids:
                     skipped += 1
+                    _record_skip(row_index, "Дубликат GUID", {"GUID": guid})
                     current_card = None
                     continue
 
@@ -371,4 +383,4 @@ def import_file2(db: Session, file_path: str | Path) -> dict:
 
     flush_card(current_card)
     db.commit()
-    return {"imported": imported, "skipped": skipped, "errors": errors}
+    return {"imported": imported, "skipped": skipped, "errors": errors, "skipped_rows": skipped_rows}

@@ -604,6 +604,35 @@
     .muted { color: var(--muted); }
     .hidden { display: none !important; }
 
+    .skipped-wrap { margin-top: 12px; }
+    .skipped-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--accent);
+      text-decoration: underline;
+    }
+    .skipped-trigger:hover { color: #c8632f; }
+    .skipped-table-wrap { margin-top: 10px; overflow-x: auto; }
+    .skipped-table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
+    .skipped-table th, .skipped-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0e2cf;
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+    }
+    .skipped-table th { background: #fcf1e4; color: var(--muted); font-weight: 600; }
+    .skipped-table td.cell-row { font-weight: 700; white-space: nowrap; }
+    .skipped-table td.cell-reason { color: var(--ink); white-space: nowrap; }
+    .skipped-table .preview-item { display: block; }
+    .skipped-table .preview-item strong { color: var(--muted); font-weight: 500; }
+
     @media (max-width: 820px) {
       table, thead, tbody, th, td, tr { display: block; }
       thead { display: none; }
@@ -757,6 +786,7 @@
             <input class="hidden file-input" type="file" accept=".xlsx">
           </div>
           <div id="status-file1" class="status"></div>
+          <div id="skipped-file1" class="skipped-wrap hidden"></div>
         </div>
 
         <div class="card">
@@ -775,6 +805,7 @@
             <input class="hidden file-input" type="file" accept=".xlsx">
           </div>
           <div id="status-file2" class="status"></div>
+          <div id="skipped-file2" class="skipped-wrap hidden"></div>
         </div>
       </div>
     </section>
@@ -1053,12 +1084,68 @@
       const formData = new FormData();
       formData.append('file', file);
       setStatus(`status-${kind}`, '\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u0444\u0430\u0439\u043b\u0430...');
+      renderSkippedRows(kind, []);
       try {
         const result  = await fetchJson(`/api/upload/${kind}`, { method: 'POST', body: formData });
         const message = `\u0418\u043c\u043f\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u043e: ${result.imported}, \u043f\u0440\u043e\u043f\u0443\u0449\u0435\u043d\u043e: ${result.skipped}, \u043e\u0448\u0438\u0431\u043a\u0438: ${result.errors.length}`;
         setStatus(`status-${kind}`, message, result.errors.length ? 'error' : 'success');
+        renderSkippedRows(kind, result.skipped_rows || []);
         await loadStats();
-      } catch (error) { setStatus(`status-${kind}`, error.message, 'error'); }
+      } catch (error) {
+        setStatus(`status-${kind}`, error.message, 'error');
+        renderSkippedRows(kind, []);
+      }
+    }
+
+    function renderSkippedRows(kind, skipped) {
+      const wrap = document.getElementById(`skipped-${kind}`);
+      wrap.innerHTML = '';
+      if (!skipped || !skipped.length) {
+        wrap.classList.add('hidden');
+        return;
+      }
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'skipped-trigger';
+      toggle.innerHTML = `\u25b6 \u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u043f\u0440\u043e\u043f\u0443\u0449\u0435\u043d\u043d\u044b\u0435 \u0441\u0442\u0440\u043e\u043a\u0438 (${skipped.length})`;
+
+      const tableWrap = document.createElement('div');
+      tableWrap.className = 'skipped-table-wrap hidden';
+      tableWrap.innerHTML = `
+        <table class="skipped-table">
+          <thead>
+            <tr>
+              <th>\u0421\u0442\u0440\u043e\u043a\u0430</th>
+              <th>\u041f\u0440\u0438\u0447\u0438\u043d\u0430</th>
+              <th>\u041a\u043b\u044e\u0447\u0435\u0432\u044b\u0435 \u0437\u043d\u0430\u0447\u0435\u043d\u0438\u044f</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>`;
+      const tbody = tableWrap.querySelector('tbody');
+      skipped.forEach(item => {
+        const tr = document.createElement('tr');
+        const preview = Object.entries(item.preview || {});
+        const previewHtml = preview.length
+          ? preview.map(([k, v]) => `<span class="preview-item"><strong>${k}:</strong> ${v}</span>`).join('')
+          : '<span class="muted">\u2014</span>';
+        tr.innerHTML = `
+          <td class="cell-row">${item.row}</td>
+          <td class="cell-reason">${item.reason}</td>
+          <td>${previewHtml}</td>`;
+        tbody.appendChild(tr);
+      });
+
+      toggle.addEventListener('click', () => {
+        const isOpen = !tableWrap.classList.contains('hidden');
+        tableWrap.classList.toggle('hidden');
+        toggle.innerHTML = isOpen
+          ? `\u25b6 \u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u043f\u0440\u043e\u043f\u0443\u0449\u0435\u043d\u043d\u044b\u0435 \u0441\u0442\u0440\u043e\u043a\u0438 (${skipped.length})`
+          : `\u25bc \u0421\u043a\u0440\u044b\u0442\u044c \u043f\u0440\u043e\u043f\u0443\u0449\u0435\u043d\u043d\u044b\u0435 \u0441\u0442\u0440\u043e\u043a\u0438 (${skipped.length})`;
+      });
+
+      wrap.append(toggle, tableWrap);
+      wrap.classList.remove('hidden');
     }
 
     async function runSearch() {
