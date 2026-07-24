@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 DATE_DDMMYYYY_RE = re.compile(r"(\d{2}\.\d{2}\.\d{4})")
 EMAIL_RE = re.compile(r"([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})", re.IGNORECASE)
 BRIF_HEADER_ROW_INDEX = 3
+BRIF_HEADER_SCAN_ROWS = 20
 
 BRIF_PRODUCT_COLUMN = "Наименование продукции"
 BRIF_SUPPLIER_COLUMN = "Наименование поставщика"
@@ -33,10 +34,24 @@ BRIF_UPDATE_DATE_COLUMN = "Дата обновления"
 BRIF_CURRENCY_COLUMN = "Валюта"
 BRIF_MANUFACTURER_COLUMN = "Наименование изготовителя"
 BRIF_MANUFACTURER_INN_COLUMN = "ИНН изготовителя"
+BRIF_REQUIRED_COLUMNS = frozenset(
+    {
+        BRIF_PRODUCT_COLUMN,
+        BRIF_SUPPLIER_COLUMN,
+        BRIF_OKPD2_COLUMN,
+        BRIF_STATUS_COLUMN,
+        BRIF_MANUFACTURER_COLUMN,
+    }
+)
 
 
 def _normalize_text(value: object) -> str | None:
     return normalize_text(value)
+
+
+def _normalize_header(value: object) -> str:
+    text = _normalize_text(value)
+    return " ".join(text.split()).casefold() if text else ""
 
 
 def _parse_decimal(value: object) -> Decimal | None:
@@ -122,17 +137,24 @@ def _extract_currency(value: object) -> str | None:
 
 
 def _is_effectively_empty_row(row) -> bool:
-    relevant_indexes = list(range(min(len(row), 26)))
-    return all(_normalize_text(row.iloc[index]) is None for index in relevant_indexes)
+    return all(_normalize_text(value) is None for value in row)
+
+
+def _find_brif_header_row(dataframe: pd.DataFrame) -> int | None:
+    required_headers = {_normalize_header(header) for header in BRIF_REQUIRED_COLUMNS}
+    for row_index in range(min(len(dataframe), BRIF_HEADER_SCAN_ROWS)):
+        row_headers = {
+            normalized
+            for value in dataframe.iloc[row_index].tolist()
+            if (normalized := _normalize_header(value))
+        }
+        if required_headers.issubset(row_headers):
+            return row_index
+    return None
 
 
 def _detect_file1_format(dataframe: pd.DataFrame) -> str:
-    if len(dataframe) > BRIF_HEADER_ROW_INDEX:
-        header_row = dataframe.iloc[BRIF_HEADER_ROW_INDEX].tolist()
-        normalized_header = [_normalize_text(cell) for cell in header_row]
-        if BRIF_PRODUCT_COLUMN in normalized_header and BRIF_MANUFACTURER_INN_COLUMN in normalized_header:
-            return "brif_registry"
-    return "legacy"
+    return "brif_registry" if _find_brif_header_row(dataframe) is not None else "legacy"
 
 
 def _build_header_map(dataframe: pd.DataFrame, header_row_index: int) -> dict[str, int]:
@@ -141,12 +163,12 @@ def _build_header_map(dataframe: pd.DataFrame, header_row_index: int) -> dict[st
     return {
         header: index
         for index, value in enumerate(dataframe.iloc[header_row_index].tolist())
-        if (header := _normalize_text(value))
+        if (header := _normalize_header(value))
     }
 
 
 def _row_value(row, columns: dict[str, int], column_name: str) -> object | None:
-    index = columns.get(column_name)
+    index = columns.get(_normalize_header(column_name))
     if index is None or index >= len(row):
         return None
     return row.iloc[index]
@@ -163,7 +185,7 @@ def _parse_legacy_row(row) -> dict:
         "supplier_site": supplier_site,
         "manufacturer_inn": identifier["value"],
         "manufacturer_identifier_type": identifier["type"],
-        "supplier_inn": _normalize_inn(row.iloc[12]),
+        "supplier_inn": normalize_inn(row.iloc[12]),
         "manufacturer_name": _normalize_text(row.iloc[10]),
         "price": _parse_decimal(row.iloc[6]),
         "currency": _normalize_text(row.iloc[8]),
@@ -206,9 +228,18 @@ def _parse_brif_registry_row(row, columns: dict[str, int]) -> dict:
 
 def import_file1(db: Session, file_path: str | Path) -> dict:
     dataframe = pd.read_excel(file_path, header=None, engine="openpyxl", dtype=object)
-    file_format = _detect_file1_format(dataframe)
-    brif_columns = _build_header_map(dataframe, BRIF_HEADER_ROW_INDEX) if file_format == "brif_registry" else {}
-    rows = dataframe.iloc[4:] if file_format == "brif_registry" else dataframe.iloc[3:]
+    brif_header_row_index = _find_brif_header_row(dataframe)
+    file_format = "brif_registry" if brif_header_row_index is not None else "legacy"
+    brif_columns = (
+        _build_header_map(dataframe, brif_header_row_index)
+        if brif_header_row_index is not None
+        else {}
+    )
+    rows = (
+        dataframe.iloc[brif_header_row_index + 1 :]
+        if brif_header_row_index is not None
+        else dataframe.iloc[3:]
+    )
 
     existing_keys = {
         (manufacturer_inn, nomenclature_name, contract_date)

@@ -7,10 +7,23 @@ from decimal import Decimal, InvalidOperation
 import pandas as pd
 
 
-INIO_FROM_NAME_RE = re.compile(r"\(ИНИО\s*([^\)]+)\)", re.IGNORECASE)
+INN_FROM_NAME_RE = re.compile(
+    r"(?<!\w)ИНН(?!\w)\s*(?:[:№#\-–—]\s*)?"
+    r"((?:\d[\s./\-–—]*){10,12})(?!\d)",
+    re.IGNORECASE,
+)
+INIO_FROM_NAME_RE = re.compile(
+    r"(?<!\w)ИНИО(?!\w)\s*(?:[:№#\-–—]\s*)?([^)]+?)\s*\)",
+    re.IGNORECASE,
+)
 
 # Допустимые длины ИНН: 10 — юрлицо, 12 — физлицо/ИП
 _INN_LENGTHS = (10, 12)
+_RECOVERABLE_INN_LENGTHS = {
+    8: 10,
+    9: 10,
+    11: 12,
+}
 
 
 def normalize_text(value: object) -> str | None:
@@ -37,14 +50,8 @@ def _pad_inn(digits: str) -> str | None:
     length = len(digits)
     if length in _INN_LENGTHS:
         return digits
-    # Пробуем дополнить до ближайшей стандартной длины
-    for target in _INN_LENGTHS:
-        if length < target:
-            padded = digits.zfill(target)
-            # Убеждаемся, что не добавили слишком много нулей
-            if len(padded) == target:
-                return padded
-    return None
+    target = _RECOVERABLE_INN_LENGTHS.get(length)
+    return digits.zfill(target) if target else None
 
 
 def normalize_inn(value: object) -> str | None:
@@ -56,26 +63,34 @@ def normalize_inn(value: object) -> str | None:
     except TypeError:
         pass
 
+    if isinstance(value, bool):
+        return None
     if isinstance(value, int):
         digits = str(value)
     elif isinstance(value, float):
-        if math.isnan(value) or math.isinf(value):
+        if math.isnan(value) or math.isinf(value) or not value.is_integer():
             return None
-        digits = str(int(round(value)))
+        digits = str(int(value))
     elif isinstance(value, Decimal):
+        if not value.is_finite() or value != value.to_integral_value():
+            return None
         digits = str(int(value))
     else:
         text = str(value).strip()
         if not text:
             return None
-        try:
-            decimal_value = Decimal(text)
-            if decimal_value == decimal_value.to_integral_value():
-                digits = str(int(decimal_value))
-            else:
-                digits = re.sub(r"\D", "", text)
-        except InvalidOperation:
+        if re.fullmatch(r"\d+", text):
+            digits = text
+        elif re.fullmatch(r"\d+(?:[\s/\-–—]+\d+)+", text):
             digits = re.sub(r"\D", "", text)
+        else:
+            try:
+                decimal_value = Decimal(text)
+            except InvalidOperation:
+                return None
+            if not decimal_value.is_finite() or decimal_value != decimal_value.to_integral_value():
+                return None
+            digits = str(int(decimal_value))
 
     return _pad_inn(digits)
 
@@ -91,8 +106,16 @@ def extract_identifier(inn_value, name_value=None, inio_value=None) -> dict[str,
 
     name_text = normalize_text(name_value)
     if name_text:
-        match = INIO_FROM_NAME_RE.search(name_text)
-        if match:
-            return {"value": match.group(1).strip(), "type": "INIO"}
+        inn_match = INN_FROM_NAME_RE.search(name_text)
+        if inn_match:
+            marked_inn = normalize_inn(inn_match.group(1))
+            if marked_inn:
+                return {"value": marked_inn, "type": "INN"}
+
+        inio_match = INIO_FROM_NAME_RE.search(name_text)
+        if inio_match:
+            marked_inio = normalize_text(inio_match.group(1))
+            if marked_inio:
+                return {"value": marked_inio, "type": "INIO"}
 
     return {"value": None, "type": None}
