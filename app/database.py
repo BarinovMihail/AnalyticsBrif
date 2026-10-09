@@ -15,15 +15,22 @@ DB_NAME = os.getenv("DB_NAME", "brifdb")
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 
-DATABASE_URL = (
-    f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-    "?charset=utf8mb4"
-)
+# Локальный запуск без MySQL/Docker: DB_ENGINE=sqlite uvicorn app.main:app ...
+if os.getenv("DB_ENGINE", "mysql").lower() == "sqlite":
+    DATABASE_URL = os.getenv("DB_URL", "sqlite:///./analyticsbrif_local.db")
+else:
+    DATABASE_URL = (
+        f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+        "?charset=utf8mb4"
+    )
+
+engine_kwargs: dict = {"pool_pre_ping": True, "future": True}
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,
-    future=True,
+    **engine_kwargs,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
@@ -32,6 +39,10 @@ Base = declarative_base()
 
 
 def ensure_optional_columns() -> None:
+    # ALTER-миграции нужны только для существующей MySQL-схемы;
+    # на SQLite таблицы создаются create_all сразу в полном виде.
+    if engine.dialect.name != "mysql":
+        return
     inspector = inspect(engine)
     table_columns = {
         "supplier_entries": {
@@ -50,6 +61,8 @@ def ensure_optional_columns() -> None:
 
 
 def ensure_column_sizes() -> None:
+    if engine.dialect.name != "mysql":
+        return
     sized_columns = {
         "supplier_entries": {
             "okpd2_code": "VARCHAR(255) NULL",

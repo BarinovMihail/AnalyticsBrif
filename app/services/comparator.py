@@ -40,6 +40,13 @@ def _parse_float(value: str) -> float:
     return float(value.replace(",", ".").strip())
 
 
+def _normalize_nomenclature(value: str | None) -> str | None:
+    """Нормализует номенклатуру для сравнения: регистр и внутренние пробелы."""
+    if not value:
+        return None
+    return " ".join(value.split()).casefold()
+
+
 def _build_condition(
     search_filter: SearchFilter,
 ) -> tuple[Optional[object], object, Optional[Callable[[str], bool]]]:
@@ -173,31 +180,49 @@ def search_cards(db: Session, filters: list[SearchFilter]) -> list[dict]:
         all_characteristics_by_card.setdefault(row.card_id, {})[row.char_name] = row.char_value
 
     cards_by_id: dict[int, MTRCard] = {}
-    freshest_supplier_by_card_id: dict[int, SupplierEntry | None] = {}
+    card_nomenclatures: dict[int, str | None] = {}
+    # Строки идут по убыванию даты контракта, поэтому списки и setdefault
+    # сохраняют порядок «самое свежее предложение первым».
+    exact_suppliers_by_card: dict[int, list[SupplierEntry]] = {}
+    fallback_supplier_by_card: dict[int, SupplierEntry] = {}
     for card, supplier in card_supplier_rows:
         cards_by_id.setdefault(card.id, card)
-        if card.id not in freshest_supplier_by_card_id:
-            freshest_supplier_by_card_id[card.id] = supplier
+        if supplier is None:
+            continue
+        if card.id not in card_nomenclatures:
+            card_nomenclatures[card.id] = _normalize_nomenclature(card.nomenclature_name)
+        card_nomenclature = card_nomenclatures[card.id]
+        if card_nomenclature and _normalize_nomenclature(supplier.nomenclature_name) == card_nomenclature:
+            exact_suppliers_by_card.setdefault(card.id, []).append(supplier)
+        else:
+            fallback_supplier_by_card.setdefault(card.id, supplier)
 
+    # На карточку выводится отдельная строка на каждое предложение с совпадающей
+    # номенклатурой; если таких предложений нет — одна строка с самым свежим
+    # предложением изготовителя (любым изделием).
     results = []
     for card_id in sorted(cards_by_id):
         card = cards_by_id[card_id]
-        supplier = freshest_supplier_by_card_id.get(card_id)
         matched_characteristics = matched_values_by_card.get(card.id, {})
-        results.append(
-            {
-                "card_guid": card.guid,
-                "card_nomenclature": card.nomenclature_name,
-                "manufacturer_inn": card.manufacturer_inn,
-                "manufacturer_name": supplier.manufacturer_name if supplier else None,
-                "supplier_name": supplier.supplier_name if supplier else None,
-                "contract_date": supplier.contract_date if supplier else None,
-                "price": float(supplier.price) if supplier and supplier.price is not None else None,
-                "currency": supplier.currency if supplier else None,
-                "matched_characteristics": matched_characteristics,
-                "all_characteristics": all_characteristics_by_card.get(card.id, {}),
-            }
-        )
+        suppliers = exact_suppliers_by_card.get(card_id)
+        if not suppliers:
+            fallback = fallback_supplier_by_card.get(card_id)
+            suppliers = [fallback] if fallback is not None else [None]
+        for supplier in suppliers:
+            results.append(
+                {
+                    "card_guid": card.guid,
+                    "card_nomenclature": card.nomenclature_name,
+                    "manufacturer_inn": card.manufacturer_inn,
+                    "manufacturer_name": supplier.manufacturer_name if supplier else None,
+                    "supplier_name": supplier.supplier_name if supplier else None,
+                    "contract_date": supplier.contract_date if supplier else None,
+                    "price": float(supplier.price) if supplier and supplier.price is not None else None,
+                    "currency": supplier.currency if supplier else None,
+                    "matched_characteristics": matched_characteristics,
+                    "all_characteristics": all_characteristics_by_card.get(card.id, {}),
+                }
+            )
     return results
 
 
